@@ -9,11 +9,9 @@ if errorlevel 1 (
   if errorlevel 1 exit /b 1
 )
 
-python -m PyInstaller --noconfirm --clean --onefile --name Phoebix ^
-  --add-data "index.html;." --add-data "styles.css;." --add-data "app.js;." ^
-  --add-data "icon.svg;." ^
+python -m PyInstaller --noconfirm --clean --onefile --windowed --name Phoebix ^
   --add-data "sample_state.json;." ^
-  server.py
+  main.py
 if errorlevel 1 (
   echo Build failed.
   pause
