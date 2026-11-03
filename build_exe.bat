@@ -11,7 +11,7 @@ if errorlevel 1 (
 
 python -m PyInstaller --noconfirm --clean --onefile --name Phoebix ^
   --add-data "index.html;." --add-data "styles.css;." --add-data "app.js;." ^
-  --add-data "manifest.json;." --add-data "sw.js;." --add-data "icon.svg;." ^
+  --add-data "icon.svg;." ^
   --add-data "sample_state.json;." ^
   server.py
 if errorlevel 1 (

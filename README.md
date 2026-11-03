@@ -1,20 +1,21 @@
-# Phoebix Pharmacy Workspace
+# Phoebix Pharmacy Workspace (desktop edition)
 
-An installable pharmacy workspace for Indian retail and wholesale operations, with a Python API and persistent SQLite database. It can also be installed as a desktop app from a supported browser.
+A desktop-only pharmacy workspace for Indian retail and wholesale operations, with a local Python API and persistent SQLite database. It runs only as `Phoebix.exe` on the PC that holds the data: there is no web or browser install, and the server listens on this PC (`127.0.0.1`) only.
 
-## Run locally
+## Run
 
-Python 3.10+ is the only requirement. Start Phoebix from this folder:
+Build the app once (needs Python 3.10+ on the build PC only), then double-click the result:
 
 ```powershell
-python server.py
+build_exe.bat
+dist\Phoebix.exe
 ```
 
-On Windows, you can instead double-click `start_phoebix.bat`. Startup creates and seeds the SQLite database before serving the app, then opens `http://127.0.0.1:4173` in your browser. Keep the server window open while using Phoebix; closing it stops the database API and saves will no longer work. In Chrome or Edge, use the install icon in the address bar or browser menu to install Phoebix as a desktop application, but start the server before opening the installed app. Set `PHOEBIX_OPEN_BROWSER=0` to run the server without opening a browser.
+Developers can run from source with `$env:PHOEBIX_DEV="1"; python server.py`. Set `PHOEBIX_OPEN_BROWSER=0` to start without opening a window.
 
 ## One-click Windows app
 
-Run `build_exe.bat` to create `dist\Phoebix.exe`, a single file that needs no Python. Double-click it to start the database and server and open Phoebix in its own window. Closing the Phoebix window also stops the server and closes the black console window. Opening it again just reopens the window.
+`dist\Phoebix.exe` is a single file that needs no Python. Double-click it to start the database and server and open Phoebix in its own window. Closing the Phoebix window also stops the server and closes the black console window. Opening it again just reopens the window.
 
 When run as the exe, the database and `.env` live in `%LOCALAPPDATA%\Phoebix\` (so they survive upgrades). Everything works offline except PhonePe payments.
 
@@ -44,7 +45,7 @@ Both start with a temporary password, and Phoebix forces a new one at first sign
 - A new or empty database is seeded by the server from `sample_state.json` before the app is served. The service worker may cache app files, but all workspace data is loaded from and saved to SQLite.
 - Back up the database by stopping the server and copying the SQLite file together with any `-wal`/`-shm` files, or use SQLite’s online backup API.
 
-The server binds to `127.0.0.1` by default and is intended for a single trusted computer. User login protects the API, but there is no HTTPS: put it behind an HTTPS reverse proxy (and set `PHOEBIX_PUBLIC_URL` to the `https://` address so the session cookie is marked Secure) before exposing it to a LAN or the internet.
+The server always binds to `127.0.0.1` and is reachable only from this PC. User login protects the API.
 
 ## PhonePe payments (sandbox)
 
@@ -52,7 +53,7 @@ UPI and card checkout use PhonePe's hosted Standard Checkout. Customers are redi
 
 1. Create a PhonePe Payment Gateway account and obtain the sandbox Client ID, Client Secret, and Client Version from the PhonePe Business Developer settings.
 2. Copy `.env.example` to `.env` and fill in the sandbox credentials. Keep `.env` private; it is excluded from Git.
-3. Restart Phoebix using `start_phoebix.bat`. UPI and card choices become available in point of sale when the server confirms the credentials are configured.
+3. Restart Phoebix.exe. UPI and card choices become available in point of sale when the server confirms the credentials are configured.
 4. For production, use PhonePe's production credentials, set `PHONEPE_ENV=production`, and set `PHOEBIX_PUBLIC_URL` to the app's public HTTPS URL. Complete PhonePe's merchant onboarding and enable the desired payment methods before accepting live payments.
 
 PhonePe API documentation: [authorization](https://developer.phonepe.com/payment-gateway/website-integration/standard-checkout/api-integration/api-reference/authorization), [initiate payment](https://developer.phonepe.com/payment-gateway/website-integration/standard-checkout/api-integration/api-reference/create-payment/initiate-payment), and [check order status](https://developer.phonepe.com/payment-gateway/website-integration/standard-checkout/api-integration/api-reference/order-status).

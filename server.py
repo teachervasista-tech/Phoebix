@@ -40,7 +40,7 @@ def load_environment_file():
 
 load_environment_file()
 DATABASE = Path(os.environ.get("PHOEBIX_DB_PATH", APP_DIR / "data" / "phoebix.sqlite3")).expanduser()
-PUBLIC_FILES = {"/", "/index.html", "/styles.css", "/app.js", "/manifest.json", "/sw.js", "/icon.svg"}
+PUBLIC_FILES = {"/", "/index.html", "/styles.css", "/app.js", "/icon.svg"}
 if not DATABASE.is_absolute():
     DATABASE = APP_DIR / DATABASE
 MAX_REQUEST_BYTES = 8 * 1024 * 1024
@@ -1062,9 +1062,12 @@ def start_database():
 
 
 def main():
+    if not FROZEN and os.environ.get("PHOEBIX_DEV") != "1":
+        raise RuntimeError("This is the desktop-only edition. Run Phoebix.exe (build it with build_exe.bat).")
     if sys.stdout is not None:
         sys.stdout.reconfigure(line_buffering=True)
-    host = os.environ.get("PHOEBIX_HOST", "127.0.0.1")
+    # Desktop-only: the server is reachable from this PC alone, whatever the environment says.
+    host = "127.0.0.1"
     port = int(os.environ.get("PHOEBIX_PORT", "4173"))
     url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}"
     open_window = os.environ.get("PHOEBIX_OPEN_BROWSER", "1") != "0"

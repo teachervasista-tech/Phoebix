@@ -111,7 +111,7 @@ async function writeStateToDatabase(snapshot, expectedRevision) {
   try {
     result = JSON.parse(responseBody);
   } catch {
-    throw new Error(`Database API returned an invalid response (HTTP ${response.status}). Start Phoebix with start_phoebix.bat.`);
+    throw new Error(`Database API returned an invalid response (HTTP ${response.status}). Start Phoebix.exe and try again.`);
   }
   if (response.status === 409) {
     const error = new Error(result.error || "The database was changed by another client.");
@@ -1109,7 +1109,3 @@ document.addEventListener("keydown", (event) => {
 document.getElementById("account-button").addEventListener("click", () => showChangePassword(false));
 document.getElementById("today-label").textContent = today.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 bootstrapSession();
-
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-  navigator.serviceWorker.register("./sw.js").catch((error) => console.error("Could not register the offline app shell.", error));
-}
