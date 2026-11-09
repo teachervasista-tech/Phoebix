@@ -100,7 +100,7 @@ class RewardsPage(Page):
         FormDialog(self, "New offer", [("name", "Offer name *", "text", None, ""),
                                        ("discount", "Discount *", "text", None, "10"),
                                        ("type", "Type", "combo", ["percent", "fixed"], "percent"),
-                                       ("end", "Valid until YYYY-MM-DD *", "text", None, "")], save, "Create offer",
+                                       ("end", "Valid until", "date", None, "")], save, "Create offer",
                    note="Administrators only.")
 
     def toggle_offer(self):
