@@ -40,6 +40,23 @@ From source: `python main.py`. Run the tests with `python -m unittest discover -
 
 The database and `.env` live in `%LOCALAPPDATA%\Phoebix\` when run as the exe (`data\phoebix_desktop.sqlite3`), or in the project folder when run from source. Set `PHOEBIX_DB_PATH` to use another file. This edition uses a new database file; data from the earlier web edition is not imported.
 
+### Rebuilding with a fresh database
+
+To reset the database and start fresh:
+
+```powershell
+rebuild_fresh.bat
+```
+
+Or manually set the environment variable before running:
+
+```powershell
+set PHOEBIX_RESET_DB=1
+dist\Phoebix.exe
+```
+
+This deletes the existing database and associated WAL files, then creates a fresh one with default sample data on next run.
+
 ## Sign-in and users
 
 | Login ID | Password | Role |
@@ -52,14 +69,26 @@ Both must choose a new password at first sign-in (or set `PHOEBIX_ADMIN_PASSWORD
 - Every sale records the signed-in login ID (`Sold by`), shown on invoices, reports and CSV exports. It comes from the session, never from a form.
 - Only administrators manage users, bank details, reward rules/offers and point adjustments. These rules are enforced in the service layer, not just by disabling buttons.
 
+### Role-based access
+
+**Administrator** sees all features:
+- Dashboard, New Sale, Inventory, Customers, Rewards & Offers, Reports, Users, Settings
+
+**Cashier (Staff)** sees only:
+- Dashboard, New Sale, Inventory, Customers, Reports
+
+Settings, Rewards & Offers, and Users management are restricted to administrators.
+
 ## Features
 
-- **New Sale**: product search, earliest-expiry batch picking, offers, manual discount, points redemption, add a customer without leaving the screen, Cash / Credit / UPI / Card, printable GST invoice.
-- **Inventory**: batches and expiry, low-stock and near-expiry filters, add product, receive stock, CSV export.
-- **Customers**: profiles, tiers (Member / Silver / Gold), points, CSV export.
-- **Rewards & Offers**: earn/redeem rules, bonus toggles, percentage or fixed offers.
-- **Reports**: sales, payment mix, inventory value by category, all invoices.
-- **Settings**: store profile and the bank account payments are made to (printed as "Pay to" on invoices).
+- **Dashboard**: sales snapshot, today's revenue, top customers.
+- **New Sale**: product search, earliest-expiry batch picking, offers, manual discount, points redemption, add a customer without leaving the screen, Cash / Credit / UPI / Card, printable GST invoice. *Available to all users.*
+- **Inventory**: batches and expiry, low-stock and near-expiry filters, add product, receive stock, CSV export. *Available to all users.*
+- **Customers**: profiles, tiers (Member / Silver / Gold), points, CSV export. *Available to all users.*
+- **Reports**: sales, payment mix, inventory value by category, all invoices. *Available to all users.*
+- **Rewards & Offers** (admin only): earn/redeem rules, bonus toggles, percentage or fixed offers.
+- **Users** (admin only): create users, manage roles, reset passwords.
+- **Settings** (admin only): store profile and the bank account payments are made to (printed as "Pay to" on invoices).
 
 ## PhonePe payments
 

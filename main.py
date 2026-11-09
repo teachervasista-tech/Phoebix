@@ -13,7 +13,14 @@ from tkinter import messagebox
 FROZEN = getattr(sys, "frozen", False)
 # ROOT holds bundled read-only files; APP_DIR holds the user's database and .env.
 ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-APP_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Phoebix" if FROZEN else ROOT
+if FROZEN:
+    localappdata = os.environ.get("LOCALAPPDATA", "")
+    if localappdata:
+        APP_DIR = Path(localappdata) / "Phoebix"
+    else:
+        APP_DIR = Path.home() / "AppData" / "Local" / "Phoebix"
+else:
+    APP_DIR = ROOT
 sys.path.insert(0, str(ROOT))
 
 
@@ -41,15 +48,54 @@ def init_database():
     from phx.data.database import Database
     from phx.services.bootstrap import bootstrap
 
-    database_path = Path(os.environ.get("PHOEBIX_DB_PATH", APP_DIR / "data" / "phoebix_desktop.sqlite3"))
-    database_path.parent.mkdir(parents=True, exist_ok=True)
+    # Diagnose path resolution
+    debug_info = []
+    debug_info.append(f"FROZEN: {FROZEN}")
+    debug_info.append(f"ROOT: {ROOT}")
+    debug_info.append(f"LOCALAPPDATA env: {os.environ.get('LOCALAPPDATA', '<not set>')}")
+    debug_info.append(f"APP_DIR: {APP_DIR}")
+
+    db_path_str = os.environ.get("PHOEBIX_DB_PATH")
+    if db_path_str:
+        database_path = Path(db_path_str)
+        debug_info.append(f"Using PHOEBIX_DB_PATH: {db_path_str}")
+    else:
+        database_path = APP_DIR / "data" / "phoebix_desktop.sqlite3"
+        debug_info.append(f"Using default path: {database_path}")
+
+    database_path = database_path.resolve()
+    debug_info.append(f"Resolved path: {database_path}")
+
+    # Check if database should be reset
+    reset_db = os.environ.get("PHOEBIX_RESET_DB", "").lower() in ("1", "true", "yes")
+    if reset_db and database_path.exists():
+        try:
+            database_path.unlink()
+            debug_info.append(f"Reset: Deleted existing database")
+            # Also delete WAL files
+            for wal_file in database_path.parent.glob(f"{database_path.name}-*"):
+                wal_file.unlink()
+        except Exception as error:
+            debug_info.append(f"Reset: Failed to delete database: {error}")
+
+    try:
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+        debug_info.append(f"Directory created/verified: {database_path.parent}")
+    except Exception as error:
+        debug_msg = "\n".join(debug_info)
+        raise RuntimeError(f"Could not create database directory:\n{debug_msg}\n\nError: {error}") from error
+
+    # Find sample_state.json: first try bundled location, then next to exe
+    sample_data_path = ROOT / "sample_state.json"
+    if not sample_data_path.exists() and FROZEN:
+        sample_data_path = Path(sys.executable).parent / "sample_state.json"
 
     try:
         # Database __init__ creates schema if needed
         db = Database(database_path)
 
         # Bootstrap default users and sample data on first run
-        bootstrap(db, ROOT / "sample_state.json")
+        bootstrap(db, sample_data_path)
 
         # Verify database integrity
         if not db.integrity_ok():
@@ -57,7 +103,7 @@ def init_database():
 
         return db
     except Exception as error:
-        raise RuntimeError(f"Database initialization failed: {error}") from error
+        raise RuntimeError(f"Database initialization failed at {database_path}: {error}") from error
 
 
 def main():
@@ -86,7 +132,12 @@ def main():
         from phx.services.container import Services
         from phx.ui.app import PhoebixApp
 
-        services = Services(database, ROOT / "sample_state.json")
+        # Find sample_state.json: first try bundled location, then next to exe
+        sample_data_path = ROOT / "sample_state.json"
+        if not sample_data_path.exists() and FROZEN:
+            sample_data_path = Path(sys.executable).parent / "sample_state.json"
+
+        services = Services(database, sample_data_path)
         PhoebixApp(services).mainloop()
         return 0
     except Exception as error:

@@ -33,7 +33,7 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --name "Phoebix" ^
   --add-data "sample_state.json;." ^
   --distpath "dist" ^
-  --buildpath "build" ^
+  --workpath "build" ^
   main.py
 
 if errorlevel 1 (
@@ -49,6 +49,11 @@ if not exist "dist\Phoebix.exe" (
   echo Build failed: Phoebix.exe not found in dist directory.
   pause
   exit /b 1
+)
+
+REM Copy sample_state.json to dist folder
+if exist "sample_state.json" (
+  copy "sample_state.json" "dist\sample_state.json" >nul
 )
 
 echo.

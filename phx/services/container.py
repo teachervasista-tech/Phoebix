@@ -11,9 +11,18 @@ from .reports import ReportService
 
 
 class Services:
-    def __init__(self, db_path, sample_path, gateway=None):
-        self.db = Database(db_path)
-        bootstrap(self.db, sample_path)
+    def __init__(self, database, sample_path=None, gateway=None):
+        # Accept either a Database object (already initialized) or a path string
+        if isinstance(database, Database):
+            self.db = database
+            if sample_path:
+                bootstrap(self.db, sample_path)
+        else:
+            # Legacy path-based initialization
+            self.db = Database(database)
+            if sample_path:
+                bootstrap(self.db, sample_path)
+
         self.session = Session()
         self.auth = AuthService(self.db, self.session)
         self.users = UserService(self.db, self.session)

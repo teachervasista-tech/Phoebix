@@ -16,6 +16,7 @@ BANK_FIELDS = [("accountHolder", "Account holder"), ("bankName", "Bank name"), (
 class SettingsPage(Page):
     title = "Settings"
     subtitle = "Store profile and the bank account payments are made to"
+    admin_only = True
 
     def build(self):
         self.header()

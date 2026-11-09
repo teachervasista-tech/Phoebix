@@ -9,6 +9,7 @@ from .widgets import FormDialog, Page, guarded
 class RewardsPage(Page):
     title = "Rewards & Offers"
     subtitle = "Points, redemption limits and discount offers"
+    admin_only = True
 
     def build(self):
         self.header([("+ New offer", self.add_offer, True)])

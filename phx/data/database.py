@@ -265,16 +265,32 @@ class Repositories:
 
 class Database:
     def __init__(self, path):
-        self.path = str(path)
-        with closing(self._connect()) as conn:
-            conn.executescript(SCHEMA)
+        from pathlib import Path
+        path_obj = Path(path)
+        self.path = str(path_obj)
+
+        try:
+            with closing(self._connect()) as conn:
+                conn.executescript(SCHEMA)
+        except sqlite3.OperationalError as e:
+            raise sqlite3.OperationalError(
+                f"Could not open database at '{self.path}'. "
+                f"Ensure the directory exists and you have write permissions. "
+                f"Original error: {e}"
+            ) from e
 
     def _connect(self):
-        conn = sqlite3.connect(self.path, timeout=15, isolation_level=None)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA journal_mode=WAL")
-        return conn
+        try:
+            conn = sqlite3.connect(self.path, timeout=15, isolation_level=None)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.execute("PRAGMA journal_mode=WAL")
+            return conn
+        except sqlite3.OperationalError as e:
+            raise sqlite3.OperationalError(
+                f"Could not open database at '{self.path}'. "
+                f"Error: {e}"
+            ) from e
 
     @contextmanager
     def unit_of_work(self, write=False):
