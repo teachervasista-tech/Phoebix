@@ -36,10 +36,32 @@ def acquire_single_instance():
     return None if ctypes.windll.kernel32.GetLastError() == 183 else handle
 
 
+def init_database():
+    """Initialize database with schema and bootstrap data."""
+    from phx.data.database import Database
+    from phx.services.bootstrap import bootstrap
+
+    database_path = Path(os.environ.get("PHOEBIX_DB_PATH", APP_DIR / "data" / "phoebix_desktop.sqlite3"))
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Database __init__ creates schema if needed
+        db = Database(database_path)
+
+        # Bootstrap default users and sample data on first run
+        bootstrap(db, ROOT / "sample_state.json")
+
+        # Verify database integrity
+        if not db.integrity_ok():
+            raise RuntimeError(f"Database {database_path} failed integrity check.")
+
+        return db
+    except Exception as error:
+        raise RuntimeError(f"Database initialization failed: {error}") from error
+
+
 def main():
     load_environment_file()
-    from phx.services.container import Services
-    from phx.ui.app import PhoebixApp
 
     guard = acquire_single_instance()
     if guard is None:
@@ -47,19 +69,34 @@ def main():
         root.withdraw()
         messagebox.showinfo("Phoebix", "Phoebix is already open on this computer.")
         return 0
-    database = Path(os.environ.get("PHOEBIX_DB_PATH", APP_DIR / "data" / "phoebix_desktop.sqlite3")).expanduser()
-    database.parent.mkdir(parents=True, exist_ok=True)
+
     try:
-        services = Services(database, ROOT / "sample_state.json")
-        if not services.db.integrity_ok():
-            raise RuntimeError(f"The database file {database} failed its integrity check.")
+        # Initialize database BEFORE importing UI components
+        database = init_database()
     except Exception as error:
         root = tk.Tk()
         root.withdraw()
-        messagebox.showerror("Phoebix could not start", f"The database could not be opened.\n\n{error}")
+        messagebox.showerror(
+            "Phoebix could not start",
+            f"The database could not be initialized.\n\n{error}"
+        )
         return 1
-    PhoebixApp(services).mainloop()
-    return 0
+
+    try:
+        from phx.services.container import Services
+        from phx.ui.app import PhoebixApp
+
+        services = Services(database, ROOT / "sample_state.json")
+        PhoebixApp(services).mainloop()
+        return 0
+    except Exception as error:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(
+            "Phoebix could not start",
+            f"An error occurred while starting the application.\n\n{error}"
+        )
+        return 1
 
 
 if __name__ == "__main__":
