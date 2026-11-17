@@ -25,6 +25,18 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist *.spec del *.spec 2>nul
 
+REM App icon: build assets\phoebix.ico from the logo if needed
+set "ICON_ARGS="
+if exist "assets\phoebix.png" if not exist "assets\phoebix.ico" (
+  python -m pip install --upgrade pillow >nul 2>nul
+  python tools\make_icon.py
+)
+if exist "assets\phoebix.ico" (
+  set "ICON_ARGS=--icon assets\phoebix.ico --add-data assets;assets"
+) else (
+  echo Warning: assets\phoebix.ico not found - the exe will use the default icon.
+)
+
 REM Build executable
 echo.
 echo Building Phoebix.exe - this may take a minute...
@@ -32,6 +44,7 @@ echo.
 python -m PyInstaller --noconfirm --clean --onefile --windowed ^
   --name "Phoebix" ^
   --add-data "sample_state.json;." ^
+  !ICON_ARGS! ^
   --distpath "dist" ^
   --workpath "build" ^
   main.py

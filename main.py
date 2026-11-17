@@ -35,6 +35,15 @@ def load_environment_file():
             os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
+def use_own_taskbar_identity():
+    """Without this, Windows groups the window under python.exe and shows the Python icon in the taskbar."""
+    if os.name == "nt":
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Phoebix.Pharmacy.Desktop")
+        except (AttributeError, OSError):
+            pass
+
+
 def acquire_single_instance():
     """Keep a second copy from opening the same database. Returns a handle to hold, or None if taken."""
     if os.name != "nt":
@@ -43,9 +52,16 @@ def acquire_single_instance():
     return None if ctypes.windll.kernel32.GetLastError() == 183 else handle
 
 
+def backup_directory():
+    """Default local backup folder; PHOEBIX_BACKUP_DIR overrides it (the Settings page can too)."""
+    override = os.environ.get("PHOEBIX_BACKUP_DIR")
+    return Path(override) if override else APP_DIR / "backups"
+
+
 def init_database():
     """Initialize database with schema and bootstrap data."""
     from phx.data.database import Database
+    from phx.services.backup import write_backup
     from phx.services.bootstrap import bootstrap
 
     # Diagnose path resolution
@@ -70,6 +86,14 @@ def init_database():
     reset_db = os.environ.get("PHOEBIX_RESET_DB", "").lower() in ("1", "true", "yes")
     if reset_db and database_path.exists():
         try:
+            # Never throw data away without a copy.
+            write_backup(str(database_path), backup_directory(), "pre-reset")
+            debug_info.append("Reset: backed up existing database")
+        except Exception as error:
+            debug_msg = "\n".join(debug_info)
+            raise RuntimeError(f"PHOEBIX_RESET_DB is set but the existing database could not be backed up, "
+                               f"so it was not deleted.\n{debug_msg}\n\nError: {error}") from error
+        try:
             database_path.unlink()
             debug_info.append(f"Reset: Deleted existing database")
             # Also delete WAL files
@@ -92,6 +116,7 @@ def init_database():
 
     try:
         # Database __init__ creates schema if needed
+        # Database __init__ creates schema if needed
         db = Database(database_path)
 
         # Bootstrap default users and sample data on first run
@@ -108,6 +133,7 @@ def init_database():
 
 def main():
     load_environment_file()
+    use_own_taskbar_identity()
 
     guard = acquire_single_instance()
     if guard is None:
@@ -137,8 +163,9 @@ def main():
         if not sample_data_path.exists() and FROZEN:
             sample_data_path = Path(sys.executable).parent / "sample_state.json"
 
-        services = Services(database, sample_data_path)
-        PhoebixApp(services).mainloop()
+        services = Services(database, sample_data_path, backup_dir=backup_directory())
+        services.backup.auto_backup_async("startup")
+        PhoebixApp(services, assets_dir=ROOT / "assets").mainloop()
         return 0
     except Exception as error:
         root = tk.Tk()

@@ -225,25 +225,23 @@ How many computers?
 ## Backup & Recovery
 
 ```
-BACKUP
-┌────────────────────────────────────┐
-│ copy "%LOCALAPPDATA%\Phoebix\data  │
-│   \phoebix_desktop.sqlite3"        │
-│ "D:\Backups\phoebix_backup.sqlite3"│
-│                                    │
-│ → Keep in multiple locations       │
-│ → Test restore procedures          │
-│ → Document backup process          │
-└────────────────────────────────────┘
+BACKUP (automatic)
+┌──────────────────────────────────────────┐
+│ On start (daily) + on close              │
+│ → %LOCALAPPDATA%\Phoebix\backups\*.zip   │
+│ → + cloud folder (Drive/OneDrive) if set │
+│ Settings → Backup & Restore → Backup now │
+│ Do NOT hand-copy the .sqlite3 while open │
+└──────────────────────────────────────────┘
 
 RESTORE
-┌────────────────────────────────────┐
-│ 1. Close Phoebix                   │
-│ 2. Delete corrupted database       │
-│ 3. Copy backup to data directory   │
-│ 4. Restart Phoebix                 │
-│ 5. Verify data integrity           │
-└────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ 1. Settings → Backup & Restore           │
+│ 2. Restore from backup… → pick .zip      │
+│ 3. Phoebix saves a pre-restore backup,   │
+│    restores, then closes                 │
+│ 4. Open Phoebix again                    │
+└──────────────────────────────────────────┘
 
 FRESH START
 ┌────────────────────────────────────┐

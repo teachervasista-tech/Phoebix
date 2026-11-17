@@ -301,20 +301,17 @@ handle = ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\PhoebixDesktop
 ### Upgrading to New Version
 
 ```
-1. Backup current database:
-   copy %LOCALAPPDATA%\Phoebix\data\phoebix_desktop.sqlite3 backup.sqlite3
+1. Close Phoebix (an automatic "close" backup is saved)
 
 2. Replace Phoebix.exe with new version
 
 3. Run new Phoebix.exe
-   - Schema is updated if needed (CREATE TABLE IF NOT EXISTS)
    - Existing data is preserved
    - New features available
 
 4. If issues occur:
-   - Close Phoebix
-   - Restore backup
-   - Test upgrade again
+   - Restore the latest *-close.zip from %LOCALAPPDATA%\Phoebix\backups
+     with the previous Phoebix.exe (Settings → Backup & Restore)
 ```
 
 ## 📝 Building and Deployment Checklist
@@ -353,7 +350,8 @@ handle = ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\PhoebixDesktop
 
 - [ ] Monitor first week for issues
 - [ ] Collect user feedback
-- [ ] Backup customer data regularly
+- [ ] Set a cloud-synced backup folder (Settings → Backup & Restore) and confirm zips reach Drive/OneDrive
+- [ ] Set tablets-per-strip for loose-sale medicines (Inventory → Pack size)
 - [ ] Plan upgrade strategy
 
 ## 🆘 Troubleshooting

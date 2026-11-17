@@ -8,6 +8,12 @@ from tkinter import filedialog, ttk
 
 from . import theme
 from .theme import inr
+from .widgets import center_on_main
+
+
+def qty_text(line):
+    """'10 tab', '2 strip' or plain '3' — old invoices have no unit label."""
+    return f"{line['qty']} {line.get('unitLabel', '')}".strip()
 
 
 def invoice_html(inv):
@@ -15,7 +21,7 @@ def invoice_html(inv):
     esc = html.escape
     rows = "".join(
         f"<tr><td>{esc(l['name'])}<br><small>HSN {esc(l['hsn'])} · Batch {esc(l['batch'])} · Exp {esc(l['expiry'])}</small></td>"
-        f"<td class=r>{l['qty']}</td><td class=r>{inr(l['price'])}</td><td class=r>{l['gst']}%</td>"
+        f"<td class=r>{esc(qty_text(l))}</td><td class=r>{inr(l['price'])}</td><td class=r>{l['gst']}%</td>"
         f"<td class=r>{inr(l['taxable'])}</td><td class=r>{inr(l['taxable'] + l['tax'])}</td></tr>" for l in inv["lines"])
     tax_rows = (f"<tr><td>CGST</td><td class=r>{inr(sum(l['cgst'] for l in inv['lines']))}</td></tr>"
                 f"<tr><td>SGST</td><td class=r>{inr(sum(l['sgst'] for l in inv['lines']))}</td></tr>" if inv["intra"] else
@@ -48,10 +54,11 @@ Customer: {esc(sale['customerName'])}{(' · ' + esc(customer['phone'])) if custo
 class InvoiceWindow(tk.Toplevel):
     def __init__(self, parent, inv):
         super().__init__(parent)
+        self.withdraw()  # shown centred over the main window below
+        self.transient(parent.winfo_toplevel())
         self.inv = inv
         self.title(f"Invoice {inv['sale']['id']}")
         self.configure(background=theme.CARD)
-        self.geometry("560x640")
         text = tk.Text(self, wrap="word", font=("Consolas", 10), background=theme.CARD, relief="flat", padx=16, pady=12)
         text.pack(fill="both", expand=True)
         text.insert("1.0", self.render_text())
@@ -61,6 +68,9 @@ class InvoiceWindow(tk.Toplevel):
         ttk.Button(bar, text="Close", command=self.destroy).pack(side="right")
         ttk.Button(bar, text="Save as HTML", command=self.save).pack(side="right", padx=6)
         ttk.Button(bar, text="Print", style="Primary.TButton", command=self.print).pack(side="right")
+        center_on_main(self, 560, 640)
+        self.lift()
+        self.focus_set()
 
     def render_text(self):
         inv, sale, store = self.inv, self.inv["sale"], self.inv["store"]
@@ -69,7 +79,7 @@ class InvoiceWindow(tk.Toplevel):
                f"{sale['id']}   {sale['date']}   {sale['payment']} ({sale['status']})",
                f"Customer : {sale['customerName']}", f"Billed by: {(sale['soldBy'] or {}).get('name', '—')}", "-" * w]
         for l in inv["lines"]:
-            out.append(f"{l['name'][:30]:<30}{l['qty']:>4} x {l['price']:>8.2f}")
+            out.append(f"{l['name'][:28]:<28}{qty_text(l):>10} x {l['price']:>8.2f}")
             out.append(f"   batch {l['batch']}  exp {l['expiry']}  GST {l['gst']}%  {l['taxable'] + l['tax']:>10.2f}")
         out += ["-" * w, f"{'Subtotal':<30}{inr(t['subtotal']):>22}", f"{'Discount':<30}{'-' + inr(t['discount']):>22}"]
         if inv["intra"]:

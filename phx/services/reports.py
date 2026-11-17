@@ -7,8 +7,8 @@ from .catalog import InventoryService
 
 
 class ReportService:
-    def __init__(self, db, session):
-        self.db, self.session = db, session
+    def __init__(self, db, session, backup=None):
+        self.db, self.session, self.backup = db, session, backup
 
     def _load(self):
         with self.db.unit_of_work() as repos:
@@ -26,13 +26,15 @@ class ReportService:
             "alerts": InventoryService.alerts(products), "recent": sales[:5],
             "customerCount": len(customers), "productCount": len(products),
             "creditDue": sum(s["total"] for s in sales if s["status"] == "Credit"),
+            "backupWarning": self.backup.warning() if self.backup else None,
         }
 
     def reports(self):
         products, customers, sales = self._load()
         by_category, mix = {}, {m: 0.0 for m in rules.PAYMENT_METHODS}
         for p in products:
-            by_category[p["category"]] = by_category.get(p["category"], 0) + p["stock"] * p["price"]
+            value = p["stock"] * p["price"] / rules.pack_size(p)  # stock is in base units, price per pack
+            by_category[p["category"]] = by_category.get(p["category"], 0) + value
         for s in sales:
             mix[s["payment"]] = mix.get(s["payment"], 0) + s["total"]
         revenue = sum(s["total"] for s in sales)
@@ -42,11 +44,14 @@ class ReportService:
 
     def export_inventory(self, path):
         products, _, _ = self._load()
-        rows = [["Product", "Category", "HSN", "GST %", "Batch", "Expiry", "Stock", "Reorder level", "Price", "MRP"]]
+        rows = [["Product", "Barcode", "Category", "HSN", "GST %", "Batch", "Expiry", "Units per pack", "Stock (units)",
+                 "Stock", "Reorder level (packs)", "Price per pack", "MRP per pack", "Loose sale"]]
         for p in products:
+            per_pack = rules.pack_size(p)
             for b in p["batches"] or [{"batch": "", "expiry": "", "stock": 0}]:
-                rows.append([p["name"], p["category"], p["hsn"], p["gst"], b["batch"], b["expiry"], b["stock"],
-                             p["reorder"], p["price"], p["mrp"]])
+                rows.append([p["name"], p["barcode"], p["category"], p["hsn"], p["gst"], b["batch"], b["expiry"], per_pack,
+                             b["stock"], rules.format_stock(b["stock"], per_pack), p["reorder"], p["price"], p["mrp"],
+                             "Yes" if p.get("allowLoose") else "No"])
         self._write(path, rows)
 
     def export_customers(self, path):

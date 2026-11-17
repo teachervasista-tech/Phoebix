@@ -3,7 +3,7 @@ import json
 import sqlite3
 from contextlib import closing, contextmanager
 
-from .schema import SCHEMA
+from .schema import INDEXES, REQUIRED_COLUMNS, SCHEMA
 
 
 class DataError(Exception):
@@ -81,6 +81,8 @@ class ProductRepo:
         batches = [dict(id=b["id"], batch=b["batch"], expiry=b["expiry"], stock=b["stock"]) for b in
                    self.conn.execute("SELECT * FROM batches WHERE product_id=? ORDER BY expiry, batch", (row["id"],))]
         product = {k: row[k] for k in row.keys()}
+        product["unitsPerPack"] = product.pop("units_per_pack", 1) or 1
+        product["allowLoose"] = bool(product.pop("allow_loose", 0))
         product.update(batches=batches, stock=sum(b["stock"] for b in batches),
                        batch=batches[0]["batch"] if batches else "", expiry=batches[0]["expiry"] if batches else "")
         return product
@@ -97,8 +99,46 @@ class ProductRepo:
 
     def add(self, p):
         self.conn.execute(
-            "INSERT INTO products (id,name,brand,category,hsn,reorder,price,mrp,gst,emoji,tone)"
-            " VALUES (:id,:name,:brand,:category,:hsn,:reorder,:price,:mrp,:gst,:emoji,:tone)", p)
+            "INSERT INTO products (id,name,brand,category,hsn,reorder,price,mrp,gst,emoji,tone,units_per_pack,allow_loose,"
+            "barcode) VALUES (:id,:name,:brand,:category,:hsn,:reorder,:price,:mrp,:gst,:emoji,:tone,:unitsPerPack,"
+            ":allowLoose,:barcode)",
+            {"unitsPerPack": 1, "barcode": "", **p, "allowLoose": int(bool(p.get("allowLoose", False)))})
+
+    def by_barcode(self, barcode):
+        if not barcode:
+            return None
+        row = self.conn.execute("SELECT * FROM products WHERE barcode=?", (barcode,)).fetchone()
+        return self._hydrate(row) if row else None
+
+    def update_details(self, product_id, p):
+        """Edit the descriptive and price fields (pack size changes go through set_pack)."""
+        self.conn.execute(
+            "UPDATE products SET name=:name, brand=:brand, category=:category, hsn=:hsn, reorder=:reorder,"
+            " price=:price, mrp=:mrp, gst=:gst, barcode=:barcode WHERE id=:id", {**p, "id": product_id})
+
+    def set_prices(self, product_id, price, mrp):
+        self.conn.execute("UPDATE products SET price=?, mrp=? WHERE id=?", (price, mrp, product_id))
+
+    def set_barcode(self, product_id, barcode):
+        self.conn.execute("UPDATE products SET barcode=? WHERE id=?", (barcode, product_id))
+
+    def set_pack(self, product_id, units_per_pack, allow_loose):
+        """Change pack size, rescaling stock so the number of packs on hand is preserved.
+
+        Raises DataError if any batch holds a part-pack (loose units), which cannot be rescaled exactly."""
+        row = self.conn.execute("SELECT units_per_pack FROM products WHERE id=?", (product_id,)).fetchone()
+        if row is None:
+            raise DataError("Product not found.")
+        old = row[0] or 1
+        if old != units_per_pack:
+            batches = self.conn.execute("SELECT id, stock FROM batches WHERE product_id=?", (product_id,)).fetchall()
+            if any(b["stock"] % old for b in batches):
+                raise DataError("Some batches have loose units left; sell or adjust them before changing pack size.")
+            for b in batches:
+                self.conn.execute("UPDATE batches SET stock=? WHERE id=?",
+                                  (b["stock"] // old * units_per_pack, b["id"]))
+        self.conn.execute("UPDATE products SET units_per_pack=?, allow_loose=? WHERE id=?",
+                          (units_per_pack, int(bool(allow_loose)), product_id))
 
     def add_batch(self, batch_id, product_id, batch, expiry, stock):
         self.conn.execute("INSERT INTO batches (id,product_id,batch,expiry,stock) VALUES (?,?,?,?,?)",
@@ -272,6 +312,15 @@ class Database:
         try:
             with closing(self._connect()) as conn:
                 conn.executescript(SCHEMA)
+                missing = [f"{table}.{column}" for table, columns in REQUIRED_COLUMNS.items()
+                           for column in columns
+                           if column not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}]
+            if missing:
+                raise DataError(
+                    f"The database at '{self.path}' was created by an older development build and is missing "
+                    f"{', '.join(missing)}. Back it up, then reset it (rebuild_fresh.bat or PHOEBIX_RESET_DB=1).")
+            with closing(self._connect()) as conn:
+                conn.executescript(INDEXES)
         except sqlite3.OperationalError as e:
             raise sqlite3.OperationalError(
                 f"Could not open database at '{self.path}'. "

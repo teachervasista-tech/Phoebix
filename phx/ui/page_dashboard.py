@@ -2,6 +2,7 @@ import tkinter as tk
 from datetime import date
 from tkinter import ttk
 
+from ..services import lookups
 from . import theme
 from .theme import DataTable, card, inr0
 from .widgets import Page
@@ -41,8 +42,8 @@ class DashboardPage(Page):
         alerts = card(right)
         alerts.grid(row=0, column=0, sticky="nsew", pady=(0, 12))
         ttk.Label(alerts, text="Stock alerts", style="CardH2.TLabel").pack(anchor="w")
-        self.alerts = DataTable(alerts, [("name", "Product", 190, "w"), ("stock", "Stock", 60, "e"),
-                                         ("note", "Alert", 110, "w")], height=4)
+        self.alerts = DataTable(alerts, [("name", "Product", 170, "w"), ("stock", "Stock", 110, "e"),
+                                         ("note", "Alert", 150, "w")], height=4)
         self.alerts.pack(fill="both", expand=True, pady=(8, 0))
         recent = card(right)
         recent.grid(row=1, column=0, sticky="nsew")
@@ -60,9 +61,13 @@ class DashboardPage(Page):
         self.labels["customers"].configure(text=str(data["customerCount"]))
         self.labels["credit"].configure(text=inr0(data["creditDue"]))
         rows = []
+        backup = data.get("backupWarning")
+        if backup:
+            rows.append(("backup", ("Data backup", "—", backup), "warn"))
         for product in data["alerts"]:
-            note = "Low stock" if product["stock"] <= product["reorder"] else "Near expiry"
-            rows.append((product["id"], (product["name"], product["stock"], note), "warn"))
+            note = "Low stock" if lookups.is_low_stock(product) else "Near expiry"
+            rows.append((product["id"], (product["name"],
+                                         lookups.format_stock(product["stock"], lookups.pack_size(product)), note), "warn"))
         self.alerts.set_rows(rows)
         self.recent.set_rows([(s["id"], (s["id"], s["customerName"], inr0(s["total"])), None) for s in data["recent"]])
         self.week = data["week"]

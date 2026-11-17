@@ -16,6 +16,12 @@ def resolve_date(value, today=None):
     return ((today or date.today()) + timedelta(days=int(match.group(1)))).isoformat()
 
 
+def pack_size_from_text(text):
+    """'MediCare · 15 tablets' -> 15; anything that is not a count of tablets/capsules -> 1."""
+    match = re.search(r"(\d+)\s*(tablets?|tabs?|capsules?|caps?)\b", text or "", re.IGNORECASE)
+    return int(match.group(1)) if match else 1
+
+
 def seed_users(repos):
     if repos.users.count():
         return
@@ -35,12 +41,15 @@ def seed_sample_data(repos, sample_path):
     repos.settings.put("rules", {**rules.DEFAULT_RULES, **sample["rules"]})
     repos.settings.put("bank", rules.DEFAULT_BANK)
     for p in sample["products"]:
-        repos.products.add({k: p.get(k, "") for k in ("id", "name", "brand", "category", "hsn", "reorder",
-                                                       "price", "mrp", "gst", "emoji", "tone")})
+        per_pack = int(p.get("unitsPerPack") or pack_size_from_text(p.get("brand", "")))
+        repos.products.add({**{k: p.get(k, "") for k in ("id", "name", "brand", "category", "hsn", "reorder",
+                                                          "price", "mrp", "gst", "emoji", "tone")},
+                            "unitsPerPack": per_pack, "allowLoose": p.get("allowLoose", per_pack > 1)})
         batches = p.get("batches") or [{"id": f"{p['id']}-batch-1", "batch": p.get("batch", ""),
                                         "expiry": p.get("expiry", ""), "stock": p.get("stock", 0)}]
         for b in batches:
-            repos.products.add_batch(b["id"], p["id"], b["batch"], resolve_date(b["expiry"]), b["stock"])
+            # Sample stock is counted in packs; the database holds base units.
+            repos.products.add_batch(b["id"], p["id"], b["batch"], resolve_date(b["expiry"]), b["stock"] * per_pack)
     for c in sample["customers"]:
         repos.customers.add({"address": "", "state": "", "gstin": "", "drugLicense": "", **c})
     for o in sample.get("offers", []):

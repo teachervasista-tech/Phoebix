@@ -126,29 +126,47 @@ The application enforces a single instance per computer:
 
 ## Backup and Data Recovery
 
-### Regular Backups
+### Automatic Backups (built in)
 
-The database is critical. Regular backups are recommended:
+Phoebix backs up its database by itself. Backups are zip files named `Phoebix-YYYYMMDD-HHMMSS-<reason>.zip`, each
+containing a verified (integrity-checked) copy of the database.
 
-1. **Manual backup**:
-   ```cmd
-   copy "%LOCALAPPDATA%\Phoebix\data\phoebix_desktop.sqlite3" "D:\Backups\phoebix_backup.sqlite3"
-   ```
+| When | Reason in file name |
+|------|---------------------|
+| On start, if the last backup is more than 24 hours old | `startup` |
+| Every time Phoebix is closed | `close` |
+| Before a restore | `pre-restore` |
+| Settings → Backup & Restore → **Backup now** | `manual` |
 
-2. **Automated backup** (Windows Task Scheduler):
-   - Create a batch file to copy the database
-   - Schedule it to run daily after closing time
+- **Local folder:** `%LOCALAPPDATA%\Phoebix\backups` by default. Change it in Settings, or with `PHOEBIX_BACKUP_DIR` in `.env`.
+  A folder on a second drive or USB disk is safer than the default.
+- **Retention:** the newest 30 backups are kept in each folder (configurable 3–365). Older ones are deleted automatically.
+- **Dashboard warning:** shown when no backup has succeeded for 3 days, or when the cloud copy is failing.
+
+> Do not back up by copying `phoebix_desktop.sqlite3` while Phoebix is open. The database runs in WAL mode, so recent
+> sales may still be in the `-wal` file. The built-in backup handles this correctly.
+
+### Cloud Backup (Google Drive / OneDrive)
+
+Phoebix does not log in to any cloud service. Instead it copies every backup into a folder that the Google Drive or
+OneDrive desktop app keeps in sync:
+
+1. Install **Google Drive for desktop** or make sure **OneDrive** is signed in on the shop PC.
+2. In Phoebix, go to **Settings → Backup & Restore → Cloud-synced folder → Browse…** and pick a folder inside Drive or
+   OneDrive, e.g. `C:\Users\<you>\OneDrive\Phoebix Backups` or `G:\My Drive\Phoebix Backups`. If one is found on the PC,
+   Phoebix suggests it.
+3. Click **Save**, then **Backup now**, and confirm the zip appears in the cloud folder and online.
+
+If the cloud folder is unavailable, for example because the drive app is not running, the local backup still succeeds.
+The failure is then shown in Settings and on the Dashboard.
 
 ### Database Restoration
 
-If the database becomes corrupted or you need to restore from backup:
+1. Sign in as an administrator → **Settings → Backup & Restore → Restore from backup…**
+2. Choose a `Phoebix-….zip` (from the local or cloud folder) and confirm.
+3. Phoebix checks the file, saves a `pre-restore` backup of the current data, restores, and closes. Open it again.
 
-1. Close Phoebix completely
-2. Replace the corrupted database:
-   ```cmd
-   copy "D:\Backups\phoebix_backup.sqlite3" "%LOCALAPPDATA%\Phoebix\data\phoebix_desktop.sqlite3"
-   ```
-3. Restart Phoebix
+Backups from an older Phoebix version are upgraded automatically when the app next opens.
 
 ### Fresh Start (Clear All Data)
 
@@ -210,16 +228,19 @@ If experiencing crashes or data integrity errors:
 
 To upgrade to a new version:
 
-1. Backup current database:
-   ```cmd
-   copy "%LOCALAPPDATA%\Phoebix\data\phoebix_desktop.sqlite3" "phoebix_backup.sqlite3"
-   ```
+1. Close Phoebix (this takes a `close` backup automatically)
 
 2. Replace `Phoebix.exe` with the new version
 
-3. Run the new version - it will automatically upgrade the database schema if needed
+3. Run the new version
 
-4. If issues occur, restore from backup and try again
+4. If issues occur, restore the `close` backup with the previous `Phoebix.exe`
+
+### Strip and loose-tablet stock
+
+- Stock is counted in **tablets** (base units); prices and MRP are **per strip/pack**.
+- Set the pack size when adding a product ("Tablets per strip"), or later via **Inventory → select the row → Pack size**.
+  Changing the pack size converts the existing stock (e.g. 5 strips → 50 tablets).
 
 ## Support
 

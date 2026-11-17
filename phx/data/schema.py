@@ -14,7 +14,10 @@ CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, brand TEXT NOT NULL DEFAULT '',
   category TEXT NOT NULL DEFAULT 'Others', hsn TEXT NOT NULL DEFAULT '',
   reorder INTEGER NOT NULL DEFAULT 0, price REAL NOT NULL, mrp REAL NOT NULL,
-  gst INTEGER NOT NULL DEFAULT 0, emoji TEXT NOT NULL DEFAULT '', tone TEXT NOT NULL DEFAULT ''
+  gst INTEGER NOT NULL DEFAULT 0, emoji TEXT NOT NULL DEFAULT '', tone TEXT NOT NULL DEFAULT '',
+  units_per_pack INTEGER NOT NULL DEFAULT 1 CHECK (units_per_pack >= 1),
+  allow_loose INTEGER NOT NULL DEFAULT 0,
+  barcode TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS batches (
   id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -44,4 +47,13 @@ CREATE TABLE IF NOT EXISTS payments (
   intent_json TEXT NOT NULL, provider_order_id TEXT, sale_id TEXT,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+"""
+
+# Columns a database must have. CREATE TABLE IF NOT EXISTS never adds columns to an existing table, so a
+# database made by a development build before these existed is reported instead of failing later.
+REQUIRED_COLUMNS = {"products": ("units_per_pack", "allow_loose", "barcode")}
+
+# Created after the column check above, because they reference those columns.
+INDEXES = """
+CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode) WHERE barcode <> '';
 """

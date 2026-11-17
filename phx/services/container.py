@@ -1,6 +1,9 @@
 """Wires the data layer into the services; the single object handed to the UI."""
+from pathlib import Path
+
 from ..data.database import Database
 from .accounts import AuthService, UserService
+from .backup import BackupService
 from .billing import BillingService
 from .bootstrap import bootstrap
 from .catalog import CustomerService, InventoryService, LoyaltyService, SettingsService
@@ -11,7 +14,7 @@ from .reports import ReportService
 
 
 class Services:
-    def __init__(self, database, sample_path=None, gateway=None):
+    def __init__(self, database, sample_path=None, gateway=None, backup_dir=None):
         # Accept either a Database object (already initialized) or a path string
         if isinstance(database, Database):
             self.db = database
@@ -32,4 +35,5 @@ class Services:
         self.loyalty = LoyaltyService(self.db, self.session)
         self.billing = BillingService(self.db, self.session)
         self.payments = PaymentService(self.db, self.session, gateway or PhonePeGateway())
-        self.reports = ReportService(self.db, self.session)
+        self.backup = BackupService(self.db, self.session, backup_dir or Path(self.db.path).parent / "backups")
+        self.reports = ReportService(self.db, self.session, self.backup)

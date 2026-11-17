@@ -249,7 +249,8 @@ PHONEPE_CLIENT_VERSION=1
 ✅ First launch: automatic database init (5-10 seconds)
 ✅ Subsequent launches: fast (1-2 seconds)
 ✅ Clear error messages if database fails
-✅ Automatic data backup procedures
+✅ Automatic backups (startup daily, on close, before restore) with optional cloud-synced folder and in-app restore
+✅ Sell full strips or single (loose) tablets; stock tracked in tablets
 ✅ Single-instance enforcement
 
 ### Documentation
@@ -361,15 +362,13 @@ Graceful error messages for:
 To upgrade to a new version:
 
 ```cmd
-1. Backup database:
-   copy %LOCALAPPDATA%\Phoebix\data\phoebix_desktop.sqlite3 backup.sqlite3
+1. Close Phoebix (automatic close backup)
 
 2. Replace Phoebix.exe with new version
 
-3. Run new version - schema updates automatically
-   (CREATE TABLE IF NOT EXISTS handles migrations)
+3. Run new version
 
-4. If issues: restore backup
+4. If issues: restore the latest close backup (Settings → Backup & Restore)
 ```
 
 ---

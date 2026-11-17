@@ -3,8 +3,18 @@ from ..domain import rules
 from .core import ServiceError
 
 
+def _line_unit(entry, product):
+    """Requests saved before loose sales existed carry no unit; they were always whole packs."""
+    unit = entry.get("unit") or "pack"
+    if unit not in rules.SALE_UNITS:
+        raise ServiceError("Unknown sale unit.")
+    if unit == "loose" and not product.get("allowLoose"):
+        raise ServiceError(f"{product['name']} can only be sold as a full pack.")
+    return unit
+
+
 def resolve_lines(repos, requested, on=None):
-    """Build priced, validated sale lines from {productId, batchId, qty} requests."""
+    """Build priced, validated sale lines from {productId, batchId, qty, unit} requests."""
     if not requested:
         raise ServiceError("Add at least one item to the bill.")
     lines, used = [], {}
@@ -18,12 +28,17 @@ def resolve_lines(repos, requested, on=None):
             raise ServiceError("A selected product batch no longer exists.")
         if rules.is_expired(batch["expiry"], on):
             raise ServiceError(f"{product['name']} batch {batch['batch']} is expired.")
-        used[batch["id"]] = used.get(batch["id"], 0) + qty
+        unit = _line_unit(entry, product)
+        per_pack = rules.pack_size(product)
+        units = rules.base_qty(product, unit, qty)
+        used[batch["id"]] = used.get(batch["id"], 0) + units
         if used[batch["id"]] > batch["stock"]:
-            raise ServiceError(f"Only {batch['stock']} unit(s) of {product['name']} batch {batch['batch']} are in stock.")
+            raise ServiceError(f"Only {rules.format_stock(batch['stock'], per_pack)} of {product['name']}"
+                               f" batch {batch['batch']} in stock.")
         lines.append({"id": product["id"], "batchId": batch["id"], "name": product["name"], "batch": batch["batch"],
-                      "expiry": batch["expiry"], "hsn": product["hsn"], "price": product["price"],
-                      "gst": product["gst"], "qty": qty})
+                      "expiry": batch["expiry"], "hsn": product["hsn"], "price": rules.unit_price(product, unit),
+                      "gst": product["gst"], "qty": qty, "unit": unit, "unitsPerPack": per_pack,
+                      "baseQty": units, "unitLabel": rules.unit_label(unit, per_pack)})
     return lines
 
 
@@ -52,7 +67,7 @@ def build_draft(repos, request, on=None):
 def record_sale(repos, draft, payment, status, sold_by, extra=None, on=None):
     """Persist a sale and apply its stock and loyalty effects. Runs inside a write unit of work."""
     for line in draft["lines"]:
-        if not repos.products.decrement_batch(line["batchId"], line["qty"]):
+        if not repos.products.decrement_batch(line["batchId"], line.get("baseQty", line["qty"])):
             raise ServiceError(f"Stock for {line['name']} changed; please review the bill.")
     customer = repos.customers.get(draft["customer"]["id"]) if draft["customer"] else None
     if customer:
@@ -87,7 +102,10 @@ class BillingService:
             for entry in request.get("lines") or []:
                 product = repos.products.get(entry["productId"])
                 if product:
-                    lines.append({"qty": entry["qty"], "price": product["price"], "gst": product["gst"]})
+                    unit = entry.get("unit") or "pack"
+                    if unit == "loose" and not product.get("allowLoose"):
+                        unit = "pack"
+                    lines.append({"qty": entry["qty"], "price": rules.unit_price(product, unit), "gst": product["gst"]})
             offer = rules.active_offer(repos.offers.all(), request.get("offerId")) if request.get("offerId") else None
             return rules.cart_totals(lines, store_rules, customer, offer, request.get("manual"), request.get("redeem") or 0)
 
